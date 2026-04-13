@@ -11,9 +11,7 @@
           <el-menu
             :default-active="activeMenu"
             router
-            background-color="#304156"
-            text-color="#bfcbd9"
-            active-text-color="#409EFF"
+            class="glass-menu"
           >
             <el-menu-item index="/">
               <el-icon><HomeFilled /></el-icon>
@@ -57,6 +55,17 @@ const activeMenu = computed(() => route.path)
 </script>
 
 <style lang="scss" scoped>
+// 玻璃拟态配色变量
+$gradient-primary: linear-gradient(135deg, #FF6B6B 0%, #FFD93D 100%);
+$color-primary: #FF6B6B;
+$color-secondary: #FFD93D;
+$color-text: #2d3748;
+$color-text-light: #718096;
+$glass-bg: rgba(255, 255, 255, 0.2);
+$glass-border: rgba(255, 255, 255, 0.3);
+$glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
+$glass-blur: blur(12px);
+
 .app-container {
   height: 100vh;
   width: 100vw;
@@ -68,7 +77,11 @@ const activeMenu = computed(() => route.path)
 }
 
 .sidebar {
-  background-color: #304156;
+  background: $glass-bg;
+  backdrop-filter: $glass-blur;
+  -webkit-backdrop-filter: $glass-blur;
+  border-right: 1px solid $glass-border;
+  box-shadow: $glass-shadow;
   overflow-y: auto;
 
   .logo {
@@ -76,24 +89,56 @@ const activeMenu = computed(() => route.path)
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
     font-size: 18px;
     font-weight: bold;
-    border-bottom: 1px solid #3a4a5b;
+    border-bottom: 1px solid $glass-border;
+    background: $gradient-primary;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 
     .el-icon {
       font-size: 24px;
       margin-right: 8px;
+      color: $color-primary;
+      -webkit-text-fill-color: $color-primary;
     }
   }
 
-  .el-menu {
+  .glass-menu {
+    background: transparent !important;
     border-right: none;
+
+    :deep(.el-menu-item) {
+      color: $color-text;
+      border-radius: 12px;
+      margin: 4px 8px;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: rgba(255, 107, 107, 0.1) !important;
+        color: $color-primary;
+      }
+
+      &.is-active {
+        background: $gradient-primary !important;
+        color: #fff !important;
+        box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+
+        .el-icon {
+          color: #fff !important;
+        }
+      }
+
+      .el-icon {
+        color: $color-text-light;
+      }
+    }
   }
 }
 
 .main-content {
-  background-color: #f0f2f5;
+  background: transparent;
   padding: 20px;
   overflow-y: auto;
 }

@@ -12,12 +12,12 @@
       <el-step title="配置与执行" />
     </el-steps>
 
-    <!-- Step 1: 选择模型（全息投影风格） -->
-    <div class="card-container holo-card-container" v-show="currentStep === 0">
-      <h3 style="margin-bottom: 16px; color: #e0f7fa;">
-        <span style="color: #00ffff; margin-right: 8px;">&#9881;</span>选择检测模型
+    <!-- Step 1: 选择模型（玻璃拟态风格） -->
+    <div class="card-container" v-show="currentStep === 0">
+      <h3 style="margin-bottom: 16px;">
+        <span style="color: #FF6B6B; margin-right: 8px;">&#9881;</span>选择检测模型
       </h3>
-      <HologramModelSelector
+      <ThreeCarouselSelector
         :models="models"
         :loading="loadingModels"
         @select="handleModelSelect"
@@ -184,7 +184,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { modelApi, taskApi } from '@/api'
-import HologramModelSelector from '@/components/HologramModelSelector.vue'
+import ThreeCarouselSelector from '@/components/ThreeCarouselSelector.vue'
 
 const router = useRouter()
 const currentStep = ref(0)
@@ -364,12 +364,5 @@ onUnmounted(() => {
 .percentage-value {
   font-size: 28px;
   font-weight: bold;
-}
-
-// 全息投影容器暗色背景
-.holo-card-container {
-  background: linear-gradient(135deg, rgba(0, 15, 30, 0.95), rgba(0, 25, 50, 0.9)) !important;
-  border: 1px solid rgba(0, 255, 255, 0.2);
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.08);
 }
 </style>
