@@ -6,86 +6,81 @@
     <!-- 全息卡片轮播区 -->
     <div class="carousel-wrapper" v-if="models.length > 0">
       <!-- 左箭头 -->
-      <div class="nav-btn left" @click="prev" :class="{ disabled: currentIndex === 0 }">
+      <div class="nav-btn left" @click="prev" :class="{ disabled: currentIndex === 0 || isAnimating }">
         <span class="arrow">&#9664;</span>
       </div>
 
-      <!-- 卡片区域 -->
-      <div class="carousel-stage">
-        <!-- 左侧卡片 -->
-        <transition name="card-slide">
+      <!-- 卡片区域 - 使用 overflow:hidden 的滑动舞台 -->
+      <div class="carousel-viewport">
+        <!-- 滑动轨道：通过 translateX 实现整体平移 -->
+        <div
+          class="carousel-track"
+          :class="{ 'no-transition': !smoothEnabled }"
+          :style="trackStyle"
+          @transitionend="onTrackTransitionEnd"
+        >
+          <!-- 渲染当前可见范围 + 缓冲的卡片 -->
           <div
-            v-if="hasPrev"
-            class="hologram-card side-card left-card"
-            @click="prev"
+            v-for="offset in visibleOffsets"
+            :key="currentIndex + offset"
+            class="hologram-card"
+            :class="getCardClass(offset)"
+            @click="handleCardClick(offset)"
           >
             <div class="card-scanline" />
-            <div class="card-content">
-              <div class="card-name">{{ prevModel?.name }}</div>
-            </div>
-          </div>
-        </transition>
-
-        <!-- 中间当前卡片 -->
-        <div class="hologram-card center-card" :class="{ locked: isLocked }" ref="centerCardRef">
-          <div class="card-scanline" />
-          <div class="card-corner tl" />
-          <div class="card-corner tr" />
-          <div class="card-corner bl" />
-          <div class="card-corner br" />
-          <div class="card-content" v-if="currentModel">
-            <div class="card-header">
-              <div class="card-icon">&#9881;</div>
-              <div class="card-name">{{ currentModel.name }}</div>
-            </div>
-            <div class="card-divider" />
-            <div class="card-info">
-              <div class="info-row">
-                <span class="info-label">池化方法</span>
-                <span class="info-value">{{ currentModel.pooling_method }}</span>
+            <template v-if="offset === 0">
+              <!-- 中心卡片 - 完整内容 -->
+              <div class="card-corner tl" />
+              <div class="card-corner tr" />
+              <div class="card-corner bl" />
+              <div class="card-corner br" />
+              <div class="card-content" v-if="currentModel">
+                <div class="card-header">
+                  <div class="card-icon">&#9881;</div>
+                  <div class="card-name">{{ currentModel.name }}</div>
+                </div>
+                <div class="card-divider" />
+                <div class="card-info">
+                  <div class="info-row">
+                    <span class="info-label">池化方法</span>
+                    <span class="info-value">{{ currentModel.pooling_method }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">训练集</span>
+                    <span class="info-value">{{ currentModel.train_dataset }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">类别数</span>
+                    <span class="info-value">{{ currentModel.num_classes }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">嵌入维度</span>
+                    <span class="info-value">{{ currentModel.embedding_dim }}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="info-label">损失函数</span>
+                    <span class="info-value">{{ currentModel.loss_func }}</span>
+                  </div>
+                </div>
+                <div class="card-divider" />
+                <div class="card-footer">
+                  <span>Query: {{ currentModel.query }}</span>
+                  <span>{{ formatTime(currentModel.create_time) }}</span>
+                </div>
               </div>
-              <div class="info-row">
-                <span class="info-label">训练集</span>
-                <span class="info-value">{{ currentModel.train_dataset }}</span>
+            </template>
+            <template v-else>
+              <!-- 侧边卡片 - 简约内容 -->
+              <div class="card-content">
+                <div class="card-name">{{ getModelAt(currentIndex + offset)?.name }}</div>
               </div>
-              <div class="info-row">
-                <span class="info-label">类别数</span>
-                <span class="info-value">{{ currentModel.num_classes }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">嵌入维度</span>
-                <span class="info-value">{{ currentModel.embedding_dim }}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">损失函数</span>
-                <span class="info-value">{{ currentModel.loss_func }}</span>
-              </div>
-            </div>
-            <div class="card-divider" />
-            <div class="card-footer">
-              <span>Query: {{ currentModel.query }}</span>
-              <span>{{ formatTime(currentModel.create_time) }}</span>
-            </div>
+            </template>
           </div>
         </div>
-
-        <!-- 右侧卡片 -->
-        <transition name="card-slide">
-          <div
-            v-if="hasNext"
-            class="hologram-card side-card right-card"
-            @click="next"
-          >
-            <div class="card-scanline" />
-            <div class="card-content">
-              <div class="card-name">{{ nextModel?.name }}</div>
-            </div>
-          </div>
-        </transition>
       </div>
 
       <!-- 右箭头 -->
-      <div class="nav-btn right" @click="next" :class="{ disabled: currentIndex === models.length - 1 }">
+      <div class="nav-btn right" @click="next" :class="{ disabled: currentIndex === models.length - 1 || isAnimating }">
         <span class="arrow">&#9654;</span>
       </div>
     </div>
@@ -182,7 +177,13 @@ const handCanvas = ref(null)
 const currentIndex = ref(0)
 const isLocked = ref(false)
 const gestureMode = ref(false)
-const gestureState = ref('idle') // idle | open | fist | swipe_left | swipe_right
+const gestureState = ref('idle')
+
+// 滑动状态
+const slideOffset = ref(0)        // 当前滑动的偏移量（-1, 0, 1）
+const isAnimating = ref(false)     // 是否正在动画中
+const smoothEnabled = ref(true)    // 是否启用 CSS transition
+const ANIM_DURATION = 480          // 动画时长 ms
 
 // 粒子引擎 & 手势检测
 let particleEngine = null
@@ -190,10 +191,27 @@ let gestureDetector = null
 
 // 计算属性
 const currentModel = computed(() => props.models[currentIndex.value])
-const prevModel = computed(() => currentIndex.value > 0 ? props.models[currentIndex.value - 1] : null)
-const nextModel = computed(() => currentIndex.value < props.models.length - 1 ? props.models[currentIndex.value + 1] : null)
 const hasPrev = computed(() => currentIndex.value > 0)
 const hasNext = computed(() => currentIndex.value < props.models.length - 1)
+
+// 渲染的卡片偏移量：-2, -1, 0, 1, 2（两侧各多一个用于滑入缓冲）
+const visibleOffsets = computed(() => {
+  const offsets = [0]
+  if (currentIndex.value > 0) offsets.push(-1)
+  if (currentIndex.value > 1) offsets.push(-2)
+  if (currentIndex.value < props.models.length - 1) offsets.push(1)
+  if (currentIndex.value < props.models.length - 2) offsets.push(2)
+  return offsets.sort((a, b) => a - b)
+})
+
+// 轨道样式：通过 translateX 控制整体位移
+const trackStyle = computed(() => {
+  // slideOffset 控制动画偏移，0 = 居中，-1 = 向左滑了一格，1 = 向右滑了一格
+  const x = -slideOffset.value * 340 // 340 = 320(卡片宽) + 20(gap)
+  return {
+    transform: `translateX(${x}px)`
+  }
+})
 
 const gestureStatusText = computed(() => {
   const map = {
@@ -205,6 +223,34 @@ const gestureStatusText = computed(() => {
   }
   return map[gestureState.value] || '等待手势...'
 })
+
+// 获取指定索引的模型
+const getModelAt = (idx) => {
+  if (idx < 0 || idx >= props.models.length) return null
+  return props.models[idx]
+}
+
+// 卡片样式类
+const getCardClass = (offset) => {
+  const cls = []
+  if (offset === 0) {
+    cls.push('center-card')
+    if (isLocked.value) cls.push('locked')
+  } else {
+    cls.push('side-card')
+    if (offset < 0) cls.push('left-card')
+    else cls.push('right-card')
+    // 滑出视口的卡片隐藏
+    if (Math.abs(offset) > 1) cls.push('buffer-card')
+  }
+  return cls
+}
+
+// 点击卡片
+const handleCardClick = (offset) => {
+  if (offset < 0) prev()
+  else if (offset > 0) next()
+}
 
 // 格式化时间
 const formatTime = (time) => {
@@ -221,53 +267,97 @@ const formatTime = (time) => {
   })
 }
 
-// 切换模型
-const prev = () => {
-  if (currentIndex.value > 0 && !isLocked.value) {
-    const oldIndex = currentIndex.value
-    currentIndex.value--
-    onCardSwitch(oldIndex, currentIndex.value, 'left')
-  }
-}
+// ===== 滑动切换逻辑 =====
 
+// 切换到下一个（向左滑，卡片向左移动）
 const next = () => {
-  if (currentIndex.value < props.models.length - 1 && !isLocked.value) {
-    const oldIndex = currentIndex.value
-    currentIndex.value++
-    onCardSwitch(oldIndex, currentIndex.value, 'right')
-  }
+  if (currentIndex.value >= props.models.length - 1 || isLocked.value || isAnimating.value) return
+  animateSlide('left')
 }
 
+// 切换到上一个（向右滑，卡片向右移动）
+const prev = () => {
+  if (currentIndex.value <= 0 || isLocked.value || isAnimating.value) return
+  animateSlide('right')
+}
+
+// 跳转到指定索引
 const goTo = (idx) => {
-  if (idx !== currentIndex.value && !isLocked.value) {
-    const direction = idx > currentIndex.value ? 'right' : 'left'
-    const oldIndex = currentIndex.value
+  if (idx === currentIndex.value || isLocked.value || isAnimating.value) return
+  const direction = idx > currentIndex.value ? 'left' : 'right'
+  const steps = Math.abs(idx - currentIndex.value)
+  if (steps === 1) {
+    animateSlide(direction)
+  } else {
+    // 多步跳转直接切换，不做动画
+    smoothEnabled.value = false
     currentIndex.value = idx
-    onCardSwitch(oldIndex, idx, direction)
+    nextTick(() => {
+      smoothEnabled.value = true
+      updateOrbitParticles()
+    })
   }
 }
 
-// 卡片切换时的粒子效果
-const onCardSwitch = (fromIdx, toIdx, direction) => {
-  if (!particleEngine) return
+// 执行滑动动画
+const animateSlide = (direction) => {
+  isAnimating.value = true
+  smoothEnabled.value = true
 
-  // 获取中心卡片位置
-  const rect = centerCardRef.value?.getBoundingClientRect()
-  const selectorRect = selectorRef.value?.getBoundingClientRect()
-  if (!rect || !selectorRect) return
+  // 设置偏移量触发 CSS transition
+  // 向左滑 → slideOffset = -1（轨道左移，右边卡片滑入中心）
+  // 向右滑 → slideOffset = 1（轨道右移，左边卡片滑入中心）
+  slideOffset.value = direction === 'left' ? -1 : 1
 
+  // 粒子拖尾效果（减少粒子数）
+  emitTrailParticles(direction)
+}
+
+// 轨道动画结束回调
+const onTrackTransitionEnd = () => {
+  if (!isAnimating.value) return
+
+  // 关闭 transition，防止数据更新时再次触发动画
+  smoothEnabled.value = false
+
+  // 根据滑动方向更新索引
+  if (slideOffset.value === -1) {
+    currentIndex.value++
+  } else if (slideOffset.value === 1) {
+    currentIndex.value--
+  }
+
+  // 重置偏移量（此时 transition 已关闭，不会触发动画）
+  slideOffset.value = 0
+
+  // 解锁
+  isLocked.value = false
+
+  // 下一帧重新启用 transition
+  nextTick(() => {
+    smoothEnabled.value = true
+    isAnimating.value = false
+    updateOrbitParticles()
+  })
+}
+
+// 粒子拖尾（减少数量避免卡顿）
+const emitTrailParticles = (direction) => {
+  if (!particleEngine || !centerCardRef.value || !selectorRef.value) return
+
+  const rect = centerCardRef.value.getBoundingClientRect()
+  const selectorRect = selectorRef.value.getBoundingClientRect()
   const cx = rect.left - selectorRect.left + rect.width / 2
   const cy = rect.top - selectorRect.top + rect.height / 2
 
-  // 拖尾效果
-  const fromX = direction === 'right' ? cx - 200 : cx + 200
-  const toX = direction === 'right' ? cx + 200 : cx - 200
-  particleEngine.trail(fromX, cy, toX, cy, 25)
+  const fromX = direction === 'left' ? cx + 150 : cx - 150
+  const toX = direction === 'left' ? cx - 150 : cx + 150
+  particleEngine.trail(fromX, cy, toX, cy, 12)
 }
 
 // 确认选择
 const confirmSelect = () => {
-  if (!currentModel.value || isLocked.value) return
+  if (!currentModel.value || isLocked.value || isAnimating.value) return
 
   isLocked.value = true
 
@@ -277,10 +367,9 @@ const confirmSelect = () => {
     const selectorRect = selectorRef.value.getBoundingClientRect()
     const cx = rect.left - selectorRect.left + rect.width / 2
     const cy = rect.top - selectorRect.top + rect.height / 2
-    particleEngine.burst(cx, cy, 100)
+    particleEngine.burst(cx, cy, 80)
   }
 
-  // 延迟发出事件，让爆发动画播放
   setTimeout(() => {
     emit('select', currentModel.value)
   }, 500)
@@ -320,7 +409,6 @@ const startGesture = async () => {
     if (particleEngine && gesture.position && gesture.type !== 'idle') {
       const selectorRect = selectorRef.value?.getBoundingClientRect()
       if (selectorRect) {
-        // 注意：摄像头画面是镜像的，需要翻转 x
         const x = (1 - gesture.position.x) * selectorRect.width
         const y = gesture.position.y * selectorRect.height
         particleEngine.followFinger(x, y, 2)
@@ -356,15 +444,18 @@ const initParticles = () => {
   particleEngine.resize(rect.width, rect.height)
   particleEngine.start()
 
-  // 初始环绕效果
   updateOrbitParticles()
 }
 
 // 更新环绕粒子位置
 const updateOrbitParticles = () => {
-  if (!particleEngine || !centerCardRef.value || !selectorRef.value) return
+  if (!particleEngine || !selectorRef.value) return
 
-  const cardRect = centerCardRef.value.getBoundingClientRect()
+  // 找到中心卡片
+  const centerEl = selectorRef.value.querySelector('.center-card')
+  if (!centerEl) return
+
+  const cardRect = centerEl.getBoundingClientRect()
   const selectorRect = selectorRef.value.getBoundingClientRect()
   const cx = cardRect.left - selectorRect.left + cardRect.width / 2
   const cy = cardRect.top - selectorRect.top + cardRect.height / 2
@@ -377,18 +468,9 @@ const updateOrbitParticles = () => {
 watch(() => props.models, () => {
   currentIndex.value = 0
   isLocked.value = false
+  slideOffset.value = 0
   nextTick(() => {
     updateOrbitParticles()
-  })
-})
-
-// 监听当前索引变化，更新粒子环绕中心
-watch(currentIndex, () => {
-  isLocked.value = false
-  nextTick(() => {
-    if (particleEngine) {
-      setTimeout(() => updateOrbitParticles(), 50)
-    }
   })
 })
 
@@ -427,6 +509,10 @@ $holo-text: #e0f7fa;
 $holo-accent: #00ffff;
 $holo-gold: #ffd700;
 $holo-scanline: rgba(0, 255, 255, 0.08);
+
+// 滑动过渡曲线：先快后慢的减速曲线
+$slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+$slide-duration: 0.48s;
 
 .hologram-selector {
   position: relative;
@@ -467,7 +553,7 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   background: rgba(0, 20, 40, 0.6);
   color: $holo-accent;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: background 0.3s, box-shadow 0.3s;
   flex-shrink: 0;
   z-index: 5;
 
@@ -486,16 +572,28 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   }
 }
 
-// 卡片舞台
-.carousel-stage {
+// 卡片视口 - 裁剪溢出
+.carousel-viewport {
+  overflow: hidden;
+  flex: 1;
+  max-width: 800px;
+  margin: 0 8px;
+  perspective: 1000px;
+}
+
+// 滑动轨道 - 通过 translateX 整体平移
+.carousel-track {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  flex: 1;
-  max-width: 800px;
-  perspective: 1000px;
-  padding: 0 10px;
+  // 核心：transform transition 实现丝滑滑动
+  transition: transform $slide-duration $slide-ease;
+  will-change: transform;
+
+  &.no-transition {
+    transition: none !important;
+  }
 }
 
 // 全息卡片基础
@@ -506,7 +604,12 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   background: $holo-bg;
   color: $holo-text;
   overflow: hidden;
-  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  // 仅对 opacity 做过渡（transform 由轨道控制）
+  transition: opacity $slide-duration $slide-ease, box-shadow $slide-duration $slide-ease;
+  will-change: opacity;
+  // GPU 加速
+  backface-visibility: hidden;
+  flex-shrink: 0;
 
   // 扫描线
   .card-scanline {
@@ -548,6 +651,7 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
 .center-card {
   width: 320px;
   min-height: 260px;
+  opacity: 1;
   box-shadow:
     0 0 20px $holo-glow,
     0 0 60px rgba(0, 255, 255, 0.1),
@@ -586,7 +690,7 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   min-height: 160px;
   opacity: 0.5;
   cursor: pointer;
-
+  // 3D 透视由各侧卡片单独控制
   &.left-card {
     transform: perspective(800px) rotateY(25deg) scale(0.85);
   }
@@ -613,6 +717,12 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
     text-align: center;
     word-break: break-all;
   }
+}
+
+// 缓冲卡片（视口外的，仅用于滑入动画，不可见）
+.buffer-card {
+  opacity: 0 !important;
+  pointer-events: none;
 }
 
 // 卡片内容
@@ -792,7 +902,7 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: scaleX(-1); // 镜像
+    transform: scaleX(-1);
   }
 
   .hand-overlay {
@@ -842,7 +952,7 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   border-color: $holo-border !important;
   color: $holo-accent !important;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: background 0.3s, box-shadow 0.3s;
 
   &:hover:not(:disabled) {
     background: rgba(0, 255, 255, 0.25) !important;
@@ -879,21 +989,5 @@ $holo-scanline: rgba(0, 255, 255, 0.08);
   .hint-icon {
     font-size: 16px;
   }
-}
-
-// 卡片滑动动画
-.card-slide-enter-active,
-.card-slide-leave-active {
-  transition: all 0.4s ease;
-}
-
-.card-slide-enter-from {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-.card-slide-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
 }
 </style>
