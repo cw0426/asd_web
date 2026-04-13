@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Database
+*.db
+*.sqlite3
+
+# Model files (large)
+*.pth
+*.pt
+*.onnx
+
+# Data files
+*.npy
+*.csv
+
+# Logs
+*.log
+eval_log.txt
+
+# Uploads (runtime data)
+backend/uploads/
+
+# Results (runtime output)
+backend/results/
+
+# Frontend
+node_modules/
+dist/
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
