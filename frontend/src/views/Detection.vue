@@ -12,26 +12,16 @@
       <el-step title="配置与执行" />
     </el-steps>
 
-    <!-- Step 1: 选择模型 -->
-    <div class="card-container" v-show="currentStep === 0">
-      <h3 style="margin-bottom: 16px;">选择检测模型</h3>
-      <el-table
-        :data="models"
-        v-loading="loadingModels"
-        highlight-current-row
-        @current-change="handleModelSelect"
-        style="width: 100%"
-      >
-        <el-table-column prop="name" label="模型名称" min-width="150" />
-        <el-table-column prop="pooling_method" label="池化方法" width="120" />
-        <el-table-column prop="train_dataset" label="训练集" width="100" />
-        <el-table-column prop="num_classes" label="类别数" width="100" />
-        <el-table-column prop="create_time" label="上传时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.create_time) }}
-          </template>
-        </el-table-column>
-      </el-table>
+    <!-- Step 1: 选择模型（全息投影风格） -->
+    <div class="card-container holo-card-container" v-show="currentStep === 0">
+      <h3 style="margin-bottom: 16px; color: #e0f7fa;">
+        <span style="color: #00ffff; margin-right: 8px;">&#9881;</span>选择检测模型
+      </h3>
+      <HologramModelSelector
+        :models="models"
+        :loading="loadingModels"
+        @select="handleModelSelect"
+      />
 
       <div style="margin-top: 20px; text-align: right;">
         <el-button type="primary" :disabled="!selectedModel" @click="currentStep = 1">
@@ -194,6 +184,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { modelApi, taskApi } from '@/api'
+import HologramModelSelector from '@/components/HologramModelSelector.vue'
 
 const router = useRouter()
 const currentStep = ref(0)
@@ -373,5 +364,12 @@ onUnmounted(() => {
 .percentage-value {
   font-size: 28px;
   font-weight: bold;
+}
+
+// 全息投影容器暗色背景
+.holo-card-container {
+  background: linear-gradient(135deg, rgba(0, 15, 30, 0.95), rgba(0, 25, 50, 0.9)) !important;
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.08);
 }
 </style>
